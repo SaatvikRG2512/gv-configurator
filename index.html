@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SUV 360° Configurator — RG Studios</title>
+<style>
+  :root { --ink:#15171c; --muted:#6b7080; --line:#e3e5ea; --accent:#dc2626; --bg:#f3f4f6; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--ink);
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; overflow:hidden; }
+  .app { display:grid; grid-template-rows:auto 1fr auto; height:100%; }
+  header { display:flex; justify-content:space-between; align-items:center; padding:18px 28px; }
+  .brand { font-weight:600; letter-spacing:.28em; font-size:14px; display:flex; align-items:center; gap:10px; }
+  .brand::before { content:""; width:4px; height:16px; background:var(--accent); }
+  .brand small { font-weight:400; letter-spacing:.12em; color:var(--muted); font-size:11px; margin-left:6px; }
+  .modes { display:flex; background:#fff; border:1px solid var(--line); border-radius:999px; padding:4px; }
+  .modes button { border:0; background:transparent; font:inherit; font-size:13px; padding:8px 18px; border-radius:999px;
+    cursor:pointer; color:var(--muted); }
+  .modes button.on { background:var(--ink); color:#fff; }
+  .iconbtn { border:1px solid var(--line); background:#fff; font:inherit; font-size:13px; padding:9px 16px; border-radius:999px; cursor:pointer; }
+  .right { display:flex; gap:10px; align-items:center; }
+
+  .stage { position:relative; min-height:0; }
+  .stage canvas { position:absolute; inset:0; width:100%; height:100%; touch-action:none; cursor:grab; }
+  .stage canvas.dragging { cursor:grabbing; }
+  #ext { background: radial-gradient(ellipse at 50% 55%, #ffffff 0%, #f3f4f6 60%, #e9ebef 100%); }
+  #int { display:none; background:#111; }
+  .stage.interior #ext { display:none; } .stage.interior #int { display:block; }
+
+  .hint { position:absolute; left:50%; bottom:18px; transform:translateX(-50%); background:rgba(21,23,28,.82); color:#fff;
+    font-size:13px; padding:10px 18px; border-radius:999px; pointer-events:none; transition:opacity .6s; white-space:nowrap; }
+  .hint.gone { opacity:0; }
+  .loader { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:220px; text-align:center;
+    font-size:12px; letter-spacing:.18em; color:var(--muted); }
+  .bar { height:3px; background:var(--line); border-radius:3px; margin-top:10px; overflow:hidden; }
+  .bar i { display:block; height:100%; width:0; background:var(--accent); transition:width .15s; }
+  .loader.done { display:none; }
+
+  footer { display:flex; justify-content:space-between; align-items:center; gap:20px; padding:16px 28px 22px; flex-wrap:wrap; }
+  .colors { display:flex; align-items:center; gap:16px; }
+  .colors .label { font-size:12px; letter-spacing:.14em; color:var(--muted); }
+  .colors .name { font-size:15px; font-weight:600; min-width:120px; }
+  .sw { width:38px; height:38px; border-radius:50%; border:2px solid transparent; cursor:pointer; padding:0;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.12), 0 4px 10px rgba(0,0,0,.08); transition: transform .15s; outline-offset:3px; }
+  .sw.on { border-color:var(--ink); transform:scale(1.08); }
+  .sw[data-c=blue]  { background: radial-gradient(circle at 30% 30%, #4d7be0, #1b3c9a 70%); }
+  .sw[data-c=red]   { background: radial-gradient(circle at 30% 30%, #ef4b4b, #9c1414 70%); }
+  .sw[data-c=white] { background: radial-gradient(circle at 30% 30%, #ffffff, #d9d9dc 75%); }
+  .note { font-size:11px; color:var(--muted); letter-spacing:.04em; }
+  .disabled { opacity:.35; pointer-events:none; }
+
+  @media (max-width: 720px) {
+    header { padding:14px 16px; flex-wrap:wrap; gap:10px; }
+    .brand small { display:none; }
+    footer { padding:12px 16px 18px; justify-content:center; text-align:center; }
+    .colors { flex-wrap:wrap; justify-content:center; }
+    .colors .name { min-width:0; width:100%; }
+    .note { width:100%; }
+    #fs { display:none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">RG STUDIOS<small>360° CONFIGURATOR · RENDER STUDY</small></div>
+    <div class="right">
+      <div class="modes" role="tablist">
+        <button id="mExt" class="on" type="button">Exterior</button>
+        <button id="mInt" type="button">Interior</button>
+      </div>
+      <button id="fs" class="iconbtn" type="button">Fullscreen</button>
+    </div>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="ext"></canvas>
+    <canvas id="int"></canvas>
+    <div class="loader" id="loader">LOADING <span id="pct">0</span>%<div class="bar"><i id="barfill"></i></div></div>
+    <div class="hint" id="hint">Drag to rotate</div>
+  </div>
+
+  <footer>
+    <div class="colors" id="colors">
+      <span class="label">COLOR</span>
+      <span class="name" id="cname">Deep Blue</span>
+      <button class="sw on" data-c="blue"  aria-label="Deep Blue"  type="button"></button>
+      <button class="sw"    data-c="red"   aria-label="Fire Red"   type="button"></button>
+      <button class="sw"    data-c="white" aria-label="Pearl White" type="button"></button>
+    </div>
+    <div class="note">3D model, materials and renders by RG Studios · independent render study, not affiliated with the manufacturer</div>
+  </footer>
+</div>
+
+<script>
+(() => {
+  const N = 60, START = 8;
+  const NAMES = { blue: "Deep Blue", red: "Fire Red", white: "Pearl White" };
+  const ORDER = ["blue", "red", "white"];
+  const src = (c, i) => `${c}/${String(i).padStart(2, "0")}.webp`;
+
+  const stage = document.getElementById("stage");
+  const ext = document.getElementById("ext"), ctx = ext.getContext("2d");
+  const hint = document.getElementById("hint");
+  const loader = document.getElementById("loader"), pct = document.getElementById("pct"), barfill = document.getElementById("barfill");
+
+  const imgs = {}; ORDER.forEach(c => imgs[c] = new Array(N + 1));
+  let color = "blue", frame = START, pos = START; // pos = continuous position
+  let mode = "ext";
+
+  function load(c, i) {
+    return new Promise(res => {
+      if (imgs[c][i]) return res();
+      const im = new Image();
+      im.decoding = "async";
+      im.onload = () => { (im.decode ? im.decode() : Promise.resolve()).catch(() => {}).then(() => { imgs[c][i] = im; res(); }); };
+      im.onerror = () => res();
+      im.src = src(c, i);
+    });
+  }
+  async function loadColor(c, onProgress) {
+    let done = 0;
+    // start near the opening angle, then spread out
+    const order = []; for (let k = 0; k < N; k++) order.push(((START - 1 + k) % N) + 1);
+    const pool = 6; let idx = 0;
+    await Promise.all(Array.from({ length: pool }, async () => {
+      while (idx < order.length) { const i = order[idx++]; await load(c, i); done++; onProgress && onProgress(done / N); }
+    }));
+  }
+
+  // ----- exterior drawing -----
+  function sizeCanvas(cv) {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2), r = cv.getBoundingClientRect();
+    const w = Math.max(1, Math.round(r.width * dpr)), h = Math.max(1, Math.round(r.height * dpr));
+    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; return true; }
+    return false;
+  }
+  function nearestLoaded(c, f) {
+    for (let d = 0; d <= N / 2; d++) {
+      const a = ((f - 1 + d) % N + N) % N + 1, b = ((f - 1 - d) % N + N) % N + 1;
+      if (imgs[c][a]) return imgs[c][a]; if (imgs[c][b]) return imgs[c][b];
+    }
+    return null;
+  }
+  let lastDrawn = null;
+  function drawExt(force) {
+    const im = imgs[color][frame] || nearestLoaded(color, frame);
+    if (!im || (!force && im === lastDrawn)) return;
+    lastDrawn = im;
+    const W = ext.width, H = ext.height;
+    const s = Math.min(W / im.naturalWidth, H / im.naturalHeight) * 1.08;
+    const w = im.naturalWidth * s, h = im.naturalHeight * s;
+    ctx.clearRect(0, 0, W, H);
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(im, (W - w) / 2, (H - h) / 2 + H * 0.02, w, h);
+  }
+  function setPos(p) {
+    pos = p;
+    const f = ((Math.round(p) - 1) % N + N) % N + 1;
+    if (f !== frame) { frame = f; }
+    drawExt();
+  }
+
+  // ----- interaction (exterior) -----
+  let dragging = false, lastX = 0, vel = 0, lastT = 0, interacted = false, autoSpin = true;
+  const PX_PER_FRAME = () => Math.max(6, ext.getBoundingClientRect().width / 75);
+  function stopAuto() { autoSpin = false; interacted = true; hint.classList.add("gone"); }
+  ext.addEventListener("pointerdown", e => {
+    dragging = true; lastX = e.clientX; lastT = performance.now(); vel = 0; stopAuto();
+    ext.setPointerCapture(e.pointerId); ext.classList.add("dragging");
+  });
+  ext.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    const now = performance.now(), dx = e.clientX - lastX; lastX = e.clientX;
+    const df = dx / PX_PER_FRAME(); setPos(pos + df);
+    const dt = Math.max(1, now - lastT); lastT = now; vel = 0.8 * vel + 0.2 * (df / dt * 16);
+  });
+  function endDrag(e) { if (!dragging) return; dragging = false; ext.classList.remove("dragging"); try { ext.releasePointerCapture(e.pointerId); } catch (_) {} }
+  ext.addEventListener("pointerup", endDrag); ext.addEventListener("pointercancel", endDrag);
+  window.addEventListener("keydown", e => {
+    if (mode !== "ext") return;
+    if (e.key === "ArrowRight") { stopAuto(); setPos(pos + 1); }
+    if (e.key === "ArrowLeft") { stopAuto(); setPos(pos - 1); }
+  });
+
+  // ----- color swatches -----
+  const swatches = [...document.querySelectorAll(".sw")], cname = document.getElementById("cname");
+  swatches.forEach(b => b.addEventListener("click", async () => {
+    const c = b.dataset.c; if (c === color) return;
+    swatches.forEach(s => s.classList.toggle("on", s === b));
+    cname.textContent = NAMES[c];
+    if (!imgs[c][frame]) await load(c, frame);
+    color = c; drawExt(true);
+    loadColor(c);
+  }));
+
+  // ----- interior (WebGL panorama) -----
+  const intCv = document.getElementById("int");
+  let pano = null;
+  function initPano() {
+    if (pano) return pano;
+    const gl = intCv.getContext("webgl", { antialias: false });
+    if (!gl) return null;
+    const vs = "attribute vec2 p;varying vec2 uv;void main(){uv=p;gl_Position=vec4(p,0.,1.);}";
+    const fs = `precision highp float;varying vec2 uv;uniform sampler2D tex;uniform float yaw,pitch,tanHalf,aspect;
+      const float PI=3.14159265359;
+      void main(){vec3 d=normalize(vec3(uv.x*tanHalf*aspect,uv.y*tanHalf,-1.0));
+      float cp=cos(pitch),sp=sin(pitch);d=vec3(d.x,d.y*cp+d.z*sp,-d.y*sp+d.z*cp);
+      float cy=cos(yaw),sy=sin(yaw);d=vec3(d.x*cy+d.z*sy,d.y,-d.x*sy+d.z*cy);
+      float lon=atan(d.x,-d.z);float lat=asin(clamp(d.y,-1.0,1.0));
+      gl_FragColor=texture2D(tex,vec2(lon/(2.0*PI)+0.5,0.5-lat/PI));}`;
+    const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); return o; };
+    const pr = gl.createProgram(); gl.attachShader(pr, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, fs));
+    gl.linkProgram(pr); gl.useProgram(pr);
+    const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
+    const l = gl.getAttribLocation(pr, "p"); gl.enableVertexAttribArray(l); gl.vertexAttribPointer(l, 2, gl.FLOAT, false, 0, 0);
+    const U = n => gl.getUniformLocation(pr, n);
+    pano = { gl, uYaw: U("yaw"), uPitch: U("pitch"), uTan: U("tanHalf"), uAsp: U("aspect"),
+             yaw: 0, pitch: 0.1, fov: 90, ready: false, pts: new Map(), pinch0: 0, fov0: 90, last: 0 };
+    const img = new Image();
+    img.onload = () => {
+      const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+      [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T].forEach(k => gl.texParameteri(gl.TEXTURE_2D, k, gl.CLAMP_TO_EDGE));
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, img);
+      pano.ready = true; loader.classList.add("done");
+    };
+    img.src = "interior.jpg";
+    const P = pano;
+    intCv.addEventListener("pointerdown", e => {
+      intCv.setPointerCapture(e.pointerId); P.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      intCv.classList.add("dragging"); P.last = performance.now(); hint.classList.add("gone");
+      if (P.pts.size === 2) { const [a, c] = [...P.pts.values()]; P.pinch0 = Math.hypot(a.x - c.x, a.y - c.y); P.fov0 = P.fov; }
+    });
+    intCv.addEventListener("pointermove", e => {
+      if (!P.pts.has(e.pointerId)) return;
+      const pv = P.pts.get(e.pointerId), cur = { x: e.clientX, y: e.clientY }; P.pts.set(e.pointerId, cur); P.last = performance.now();
+      if (P.pts.size === 1) {
+        const k = (P.fov * Math.PI / 180) / intCv.getBoundingClientRect().height;
+        P.yaw += (cur.x - pv.x) * k; P.pitch = Math.max(-1.45, Math.min(1.45, P.pitch - (cur.y - pv.y) * k));
+      } else if (P.pts.size === 2 && P.pinch0) {
+        const [a, c] = [...P.pts.values()]; P.fov = Math.max(35, Math.min(110, P.fov0 * P.pinch0 / Math.hypot(a.x - c.x, a.y - c.y)));
+      }
+    });
+    const up = e => { P.pts.delete(e.pointerId); if (!P.pts.size) intCv.classList.remove("dragging"); P.pinch0 = 0; };
+    intCv.addEventListener("pointerup", up); intCv.addEventListener("pointercancel", up);
+    intCv.addEventListener("wheel", e => { e.preventDefault(); P.last = performance.now();
+      P.fov = Math.max(35, Math.min(110, P.fov * Math.exp(e.deltaY * 0.001))); }, { passive: false });
+    return pano;
+  }
+  function drawPano(dt, now) {
+    const P = pano; if (!P || !P.ready) return;
+    if (!P.pts.size && now - P.last > 3000) P.yaw += dt * 0.1;
+    const gl = P.gl; gl.viewport(0, 0, intCv.width, intCv.height);
+    gl.uniform1f(P.uYaw, P.yaw); gl.uniform1f(P.uPitch, P.pitch);
+    gl.uniform1f(P.uTan, Math.tan(P.fov * Math.PI / 360)); gl.uniform1f(P.uAsp, intCv.width / intCv.height);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
+  // ----- modes -----
+  const mExt = document.getElementById("mExt"), mInt = document.getElementById("mInt"), colorsEl = document.getElementById("colors");
+  function setMode(m) {
+    mode = m; mExt.classList.toggle("on", m === "ext"); mInt.classList.toggle("on", m === "int");
+    stage.classList.toggle("interior", m === "int");
+    colorsEl.classList.toggle("disabled", m === "int");
+    if (m === "int") {
+      hint.textContent = "Drag to look around · Scroll or pinch to zoom"; hint.classList.remove("gone");
+      const P = initPano();
+      if (P && !P.ready) { loader.classList.remove("done"); pct.textContent = "…"; barfill.style.width = "60%"; }
+      sizeCanvas(intCv);
+    } else {
+      loader.classList.add("done"); hint.textContent = "Drag to rotate"; sizeCanvas(ext); drawExt(true);
+    }
+  }
+  mExt.addEventListener("click", () => setMode("ext"));
+  mInt.addEventListener("click", () => setMode("int"));
+  document.getElementById("fs").addEventListener("click", async () => {
+    try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); } catch (_) {}
+  });
+
+  addEventListener("resize", () => { if (sizeCanvas(ext)) drawExt(true); sizeCanvas(intCv); });
+
+  // ----- loop: inertia + auto spin -----
+  let prev = performance.now();
+  function tick(now) {
+    const dt = Math.min(0.05, (now - prev) / 1000); prev = now;
+    if (mode === "ext") {
+      if (!dragging && Math.abs(vel) > 0.01) { setPos(pos + vel); vel *= 0.92; }
+      else if (autoSpin && allLoaded) setPos(pos + dt * 9); // ~6.7s per full turn
+    } else drawPano(dt, now);
+    requestAnimationFrame(tick);
+  }
+
+  // ----- boot -----
+  let allLoaded = false;
+  sizeCanvas(ext);
+  load("blue", START).then(() => drawExt(true));
+  loadColor("blue", p => { pct.textContent = Math.round(p * 100); barfill.style.width = (p * 100) + "%"; drawExt(); })
+    .then(() => {
+      allLoaded = true; loader.classList.add("done");
+      // one slow spin, then stop at the opening angle
+      setTimeout(() => { if (!interacted) { autoSpin = true; } }, 400);
+      loadColor("red").then(() => loadColor("white"));
+    });
+  // stop auto spin after one full turn
+  const startPos = START;
+  setInterval(() => { if (autoSpin && pos - startPos >= N) { autoSpin = false; setPos(startPos + N); } }, 100);
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
